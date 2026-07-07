@@ -1,0 +1,6 @@
+last_updated = "2026-07-07T01:45:29Z"
+
+[[contracts]]
+name = "PayrollVault"
+package_name = "PayrollVault"
+package_hash = "hash-a9b847d4b2688ec1bdfd430f0a1a6488cb9395634aa680657a6ce6e5fd7579ee"

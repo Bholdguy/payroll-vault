@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>payrollvault — on-chain earnings ledger for ai agents</title>
+    <meta name="description" content="payrollvault is an on-chain earnings ledger for ai agents on casper. one contract records every payment. anyone can verify the total.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23070b19'/%3E%3Cpath d='M9 22V10h7.5a4.5 4.5 0 1 1 0 9H13' stroke='%2300ffcc' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <style>
+        :root {
+            --bg-color: #070b19;
+            --card-bg: #0d1527;
+            --border-color: #1e2942;
+            --mint: #00ffcc;
+            --mint-glow: rgba(0, 255, 204, 0.15);
+            --red: #ff4a4a;
+            --text-main: #e2e8f0;
+            --text-muted: #8892b0;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--mint);
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        h1, h2, h3, h4 { font-weight: 800; letter-spacing: -0.03em; color: #ffffff; }
+        .h2 { text-transform: lowercase; font-size: 32px; margin-bottom: 12px; }
+        p { color: var(--text-muted); font-size: 16px; }
+
+        a { color: var(--mint); text-decoration: none; transition: all 0.2s ease; }
+        a:hover { text-shadow: 0 0 8px var(--mint); }
+        a:focus-visible, button:focus-visible {
+            outline: 2px solid var(--mint);
+            outline-offset: 3px;
+            border-radius: 2px;
+        }
+
+        .accent-text { color: var(--mint); text-shadow: 0 0 20px rgba(0, 255, 204, 0.3); }
+
+        section { padding: 100px 0; border-bottom: 1px solid var(--border-color); }
+
+        /* Header */
+        .site-header {
+            position: sticky; top: 0; z-index: 10;
+            background: rgba(7, 11, 25, 0.85);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header-flex {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 0;
+        }
+        .wordmark {
+            font-weight: 800; color: #fff; font-size: 16px; letter-spacing: -0.02em;
+        }
+        .wordmark .accent-text { text-shadow: none; }
+        .header-links { display: flex; gap: 24px; align-items: center; font-size: 14px; }
+        .header-links a { color: var(--text-muted); }
+        .header-links a:hover { color: var(--mint); text-shadow: none; }
+
+        /* Hero */
+        .hero-section { position: relative; padding: 140px 0 120px 0; overflow: hidden; }
+
+        .light-trail {
+            position: absolute;
+            top: 20%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px; height: 350px;
+            background: radial-gradient(ellipse at center, rgba(0, 255, 204, 0.08) 0%, rgba(7, 11, 25, 0) 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero-content { position: relative; z-index: 1; max-width: 800px; }
+        .hero-title { font-size: 56px; line-height: 1.05; margin-bottom: 24px; text-transform: lowercase; }
+        .hero-subtitle { font-size: 18px; max-width: 600px; margin-bottom: 32px; color: var(--text-muted); }
+
+        .btn {
+            display: inline-block;
+            background: var(--mint);
+            color: #070b19;
+            font-weight: 700;
+            padding: 14px 28px;
+            border-radius: 4px;
+            font-size: 15px;
+            box-shadow: 0 4px 20px var(--mint-glow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0, 255, 204, 0.4); text-shadow: none; }
+
+        .btn-secondary {
+            display: inline-block;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-weight: 600;
+            padding: 14px 28px;
+            border-radius: 4px;
+            font-size: 15px;
+            margin-left: 12px;
+        }
+        .btn-secondary:hover { border-color: var(--mint); text-shadow: none; }
+
+        /* Problem */
+        .problem-row { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+
+        .problem-card {
+            background: rgba(255, 74, 74, 0.02);
+            border: 1px solid rgba(255, 74, 74, 0.15);
+            padding: 32px 40px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .problem-card::before {
+            content: '';
+            position: absolute; top: 0; left: 0;
+            width: 3px; height: 100%;
+            background: var(--red);
+        }
+        .problem-line {
+            display: flex; gap: 14px; align-items: baseline;
+            padding: 14px 0;
+        }
+        .problem-line + .problem-line { border-top: 1px solid rgba(255, 74, 74, 0.1); }
+        .problem-line .marker {
+            font-family: var(--font-mono);
+            color: var(--red);
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        .problem-line p { color: var(--text-main); font-size: 15px; }
+        .problem-title { font-size: 32px; margin-bottom: 20px; text-transform: lowercase; }
+
+        /* How it works */
+        .timeline-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; }
+        .timeline-card { background: var(--card-bg); border: 1px solid var(--border-color); padding: 32px; border-radius: 6px; }
+        .timeline-step { font-family: var(--font-mono); color: var(--mint); font-size: 12px; margin-bottom: 16px; display: block; }
+        .timeline-card h3 { font-size: 20px; margin-bottom: 12px; text-transform: lowercase; }
+
+        /* On-chain state panel */
+        .live-panel-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 48px; align-items: start; }
+
+        .data-display-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px; margin-bottom: 20px;
+        }
+        .net-badge {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--mint);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            padding: 3px 10px;
+            border-radius: 99px;
+        }
+
+        .ledger-row {
+            display: flex; justify-content: space-between; gap: 16px; align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-family: var(--font-mono);
+            font-size: 13px;
+        }
+        .ledger-row .k { color: var(--text-muted); white-space: nowrap; }
+        .ledger-row .v { color: #ffffff; font-weight: 600; text-align: right; overflow-wrap: anywhere; display: flex; gap: 8px; align-items: center; }
+
+        .copy-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+        .copy-btn:hover { color: var(--mint); border-color: var(--mint); }
+        .copy-btn.copied { color: #070b19; background: var(--mint); border-color: var(--mint); }
+
+        .panel-footnote { font-size: 12px; color: var(--text-muted); margin-top: 16px; font-family: var(--font-mono); }
+
+        /* Tech strip */
+        .tech-strip { padding: 40px 0; background: rgba(13, 21, 39, 0.4); border-bottom: 1px solid var(--border-color); }
+        .tech-grid { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 24px; }
+        .tech-item { font-family: var(--font-mono); font-size: 14px; color: var(--text-muted); letter-spacing: 0.05em; }
+
+        /* Comparison table */
+        .table-wrapper { overflow-x: auto; margin-top: 40px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 20px; border-bottom: 1px solid var(--border-color); font-size: 15px; }
+        th { font-weight: 700; color: #ffffff; }
+        td { color: var(--text-muted); }
+        .glow-col {
+            background: rgba(0, 255, 204, 0.02);
+            border-left: 1px solid rgba(0, 255, 204, 0.15);
+            border-right: 1px solid rgba(0, 255, 204, 0.15);
+        }
+        th.glow-col { color: var(--mint); border-top: 1px solid rgba(0, 255, 204, 0.15); }
+        td.glow-col { color: var(--text-main); }
+        tr:last-child td.glow-col { border-bottom: 1px solid rgba(0, 255, 204, 0.15); }
+
+        /* Roadmap */
+        .roadmap-list { margin-top: 40px; max-width: 640px; }
+        .roadmap-item { position: relative; padding-left: 32px; margin-bottom: 32px; }
+        .roadmap-item::before {
+            content: '';
+            position: absolute; left: 0; top: 8px;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--border-color);
+        }
+        .roadmap-item.current::before,
+        .roadmap-item.done::before { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
+        .roadmap-status { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .roadmap-status.now { color: var(--mint); }
+        .roadmap-status.next { color: var(--text-muted); }
+        .roadmap-item h3 { font-size: 18px; margin-bottom: 6px; text-transform: lowercase; }
+
+        /* FAQ */
+        .faq-grid { margin-top: 40px; max-width: 750px; }
+        .faq-item { border: 1px solid var(--border-color); background: var(--card-bg); border-radius: 6px; margin-bottom: 16px; overflow: hidden; }
+        .faq-trigger {
+            width: 100%; padding: 24px;
+            background: none; border: none;
+            text-align: left;
+            color: #ffffff;
+            font-size: 16px; font-weight: 700;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            display: flex; justify-content: space-between; align-items: center; gap: 16px;
+        }
+        .faq-trigger::after { content: '+'; font-family: var(--font-mono); color: var(--text-muted); font-size: 18px; flex-shrink: 0; }
+        .faq-item.active .faq-trigger::after { content: '−'; color: var(--mint); }
+        .faq-content { padding: 0 24px; max-height: 0; overflow: hidden; transition: max-height 0.25s ease-out, padding 0.25s ease-out; }
+        .faq-item.active .faq-content { padding: 0 24px 24px 24px; max-height: 400px; }
+
+        /* Footer */
+        footer { padding: 60px 0; background: #040711; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+        .footer-flex { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        .footer-flex div { overflow-wrap: anywhere; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .btn, .btn:hover { transform: none; }
+            .faq-content { transition: none; }
+        }
+
+        @media (max-width: 768px) {
+            .hero-title { font-size: 40px; }
+            .problem-row, .timeline-grid, .live-panel-grid { grid-template-columns: 1fr; gap: 32px; }
+            .tech-grid { justify-content: center; }
+            section { padding: 60px 0; }
+            .btn-secondary { margin-left: 0; margin-top: 12px; }
+            .header-links a:not(:last-child) { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="site-header">
+        <div class="container">
+            <div class="header-flex">
+                <span class="wordmark">payroll<span class="accent-text">vault</span></span>
+                <nav class="header-links">
+                    <a href="#how">how it works</a>
+                    <a href="#state">on-chain state</a>
+                    <a href="docs.html">docs</a>
+                    <a href="https://testnet.cspr.live/contract-package/a9b847d4b2688ec1bdfd430f0a1a6488cb9395634aa680657a6ce6e5fd7579ee" target="_blank" rel="noopener">view contract ↗</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero-section">
+        <div class="light-trail"></div>
+        <div class="container">
+            <div class="hero-content">
+                <span class="section-label">live on casper testnet</span>
+                <h1 class="hero-title">pay your agents. <span class="accent-text">prove it forever.</span></h1>
+                <p class="hero-subtitle">payrollvault is an on-chain earnings ledger for ai agents on casper. one contract records every payment. anyone can verify the total.</p>
+                <a href="https://testnet.cspr.live/contract-package/a9b847d4b2688ec1bdfd430f0a1a6488cb9395634aa680657a6ce6e5fd7579ee" target="_blank" rel="noopener" class="btn">view the contract</a>
+                <a href="https://testnet.cspr.live/transaction/2afc60728b260eb117cc537335346761afba8189ae50bfcfdd1df96acf892301" target="_blank" rel="noopener" class="btn-secondary">deployment tx →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech strip -->
+    <div class="tech-strip">
+        <div class="container">
+            <div class="tech-grid">
+                <div class="tech-item">network: casper testnet</div>
+                <div class="tech-item">framework: odra (rust)</div>
+                <div class="tech-item">events: ces standard</div>
+                <div class="tech-item">reads: free, no permission</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Problem -->
+    <section>
+        <div class="container">
+            <span class="section-label">the problem</span>
+            <div class="problem-row">
+                <div>
+                    <h2 class="problem-title">agent work history lives in databases nobody can check.</h2>
+                    <p>ai agents are starting to do paid work — api calls, content, trades, tasks. but what an agent has earned sits in some platform's private database. no one outside can verify it, and the agent can't take it anywhere.</p>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-line">
+                        <span class="marker">→</span>
+                        <p>platform shuts down: the agent's entire earnings history disappears with it.</p>
+                    </div>
+                    <div class="problem-line">
+                        <span class="marker">→</span>
+                        <p>an admin edits a record: nobody outside the company can tell.</p>
+                    </div>
+                    <div class="problem-line">
+                        <span class="marker">→</span>
+                        <p>the agent moves platforms: its track record can't come along.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="how">
+        <div class="container">
+            <span class="section-label">how it works</span>
+            <h2 class="h2">one contract, three moves</h2>
+            <p style="max-width: 600px; margin-bottom: 40px;">the whole protocol is deliberately small — small enough to audit in one sitting.</p>
+
+            <div class="timeline-grid">
+                <div class="timeline-card">
+                    <span class="timeline-step">01 / record</span>
+                    <h3>operator records a payment</h3>
+                    <p>an authorized operator calls the contract with an agent id and an amount. unauthorized callers are rejected by the contract itself — not by a ui.</p>
+                </div>
+                <div class="timeline-card">
+                    <span class="timeline-step">02 / accumulate</span>
+                    <h3>the ledger adds it up</h3>
+                    <p>the amount is added to that agent's lifetime total in on-chain storage, and an event fires with the agent id, amount, and block timestamp — in ces, casper's standard event format.</p>
+                </div>
+                <div class="timeline-card">
+                    <span class="timeline-step">03 / verify</span>
+                    <h3>anyone reads the total</h3>
+                    <p>any platform, person, or agent can query any agent's total earnings. reads are free, need no account, and can't be blocked.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- On-chain state -->
+    <section id="state">
+        <div class="container">
+            <div class="live-panel-grid">
+                <div>
+                    <span class="section-label">on-chain state</span>
+                    <h2 class="h2" style="margin-bottom: 20px;">real records, on a real network.</h2>
+                    <p style="margin-bottom: 20px;">everything on this card is actual state from the deployed contract — the first recorded payment, the account authorized to write, and the deployment itself. click through and check.</p>
+                    <p><a href="https://testnet.cspr.live/contract-package/a9b847d4b2688ec1bdfd430f0a1a6488cb9395634aa680657a6ce6e5fd7579ee" target="_blank" rel="noopener">inspect the contract on testnet.cspr.live →</a></p>
+                </div>
+
+                <div class="data-display-card">
+                    <div class="panel-header">
+                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: bold;">ledger state</span>
+                        <span class="net-badge">casper testnet</span>
+                    </div>
+                    <div class="ledger-row">
+                        <span class="k">contract package</span>
+                        <span class="v">a9b847d4…5fd7579ee
+                            <button class="copy-btn" data-copy="a9b847d4b2688ec1bdfd430f0a1a6488cb9395634aa680657a6ce6e5fd7579ee" aria-label="copy contract package hash">copy</button>
+                        </span>
+                    </div>
+                    <div class="ledger-row">
+                        <span class="k">get_earnings("agent-001")</span>
+                        <span class="v">1,000</span>
+                    </div>
+                    <div class="ledger-row">
+                        <span class="k">authorized_caller</span>
+                        <span class="v">bf1aa4c7…cb072329
+                            <button class="copy-btn" data-copy="bf1aa4c72221820ddd4271f9cfb428ad792182b77978b3df9b147b09cb072329" aria-label="copy authorized caller account hash">copy</button>
+                        </span>
+                    </div>
+                    <div class="ledger-row">
+                        <span class="k">deployment</span>
+                        <span class="v"><a href="https://testnet.cspr.live/transaction/2afc60728b260eb117cc537335346761afba8189ae50bfcfdd1df96acf892301" target="_blank" rel="noopener">2afc6072…f892301 →</a></span>
+                    </div>
+                    <p class="panel-footnote">state snapshot, verified july 7, 2026. amounts are raw ledger units set by the operator.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison -->
+    <section>
+        <div class="container">
+            <span class="section-label">the architecture</span>
+            <h2 class="h2">built for portability</h2>
+            <p style="max-width: 600px;">how payrollvault differs from keeping earnings in a platform database.</p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>capability</th>
+                            <th>platform database</th>
+                            <th class="glow-col">payrollvault</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>tamper resistance</strong></td>
+                            <td>admins can edit records silently</td>
+                            <td class="glow-col">records can only be added, never edited — every write is a signed on-chain transaction</td>
+                        </tr>
+                        <tr>
+                            <td><strong>who can read</strong></td>
+                            <td>whoever the platform allows, via its api</td>
+                            <td class="glow-col">anyone, directly from chain state, free</td>
+                        </tr>
+                        <tr>
+                            <td><strong>survivability</strong></td>
+                            <td>tied to one company staying alive</td>
+                            <td class="glow-col">replicated across the casper node network</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap -->
+    <section>
+        <div class="container">
+            <span class="section-label">roadmap</span>
+            <h2 class="h2">where this goes</h2>
+
+            <div class="roadmap-list">
+                <div class="roadmap-item current">
+                    <span class="roadmap-status now">live now</span>
+                    <h3>v1 on casper testnet</h3>
+                    <p>the core ledger — single authorized operator, per-agent lifetime totals, an on-chain event for every payment. deployed, verified, and holding real records.</p>
+                </div>
+                <div class="roadmap-item done">
+                    <span class="roadmap-status now">built &amp; tested</span>
+                    <h3>v2: multi-operator + transferable ownership</h3>
+                    <p>owner role with two-step ownership transfer, add/remove operators, and events for every permission change. 5/5 tests passing. deployment is next.</p>
+                </div>
+                <div class="roadmap-item">
+                    <span class="roadmap-status next">then</span>
+                    <h3>mainnet</h3>
+                    <p>production deployment once v2 has run on testnet long enough to trust with real payroll.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section>
+        <div class="container">
+            <span class="section-label">faq</span>
+            <h2 class="h2" style="margin-bottom: 40px;">common questions</h2>
+
+            <div class="faq-grid">
+                <div class="faq-item">
+                    <button class="faq-trigger" aria-expanded="false">where does the access control live?</button>
+                    <div class="faq-content">
+                        <p>in the contract. record_payment checks the caller against the authorized account and rejects the call on-chain if it doesn't match. this site is just a reader — there's nothing here to hack that would let anyone write to the ledger.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-trigger" aria-expanded="false">does payrollvault move money?</button>
+                    <div class="faq-content">
+                        <p>no. it's a ledger, not a payment rail. it records that a payment happened and keeps the running total per agent. no streaming, no escrow, no tokens, no yield.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-trigger" aria-expanded="false">what does it cost to read an agent's earnings?</button>
+                    <div class="faq-content">
+                        <p>nothing. reading contract state on casper is free and needs no account. only writes — recording a payment — cost gas, and only the authorized operator can make them.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-trigger" aria-expanded="false">is this on mainnet?</button>
+                    <div class="faq-content">
+                        <p>not yet. v1 is live on casper testnet, with the contract and every claim on this page verifiable there. mainnet comes after v2 (multi-operator, transferable ownership) has proven itself on testnet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-flex">
+                <div>contract package: a9b847d4b2688ec1bdfd430f0a1a6488cb9395634aa680657a6ce6e5fd7579ee</div>
+                <div>payrollvault — built on casper</div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // FAQ accordion
+        document.querySelectorAll('.faq-trigger').forEach(button => {
+            button.addEventListener('click', () => {
+                const item = button.parentElement;
+                const isActive = item.classList.toggle('active');
+                button.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+            });
+        });
+
+        // Copy-to-clipboard for hashes
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(btn.dataset.copy);
+                    btn.textContent = 'copied';
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.textContent = 'copy';
+                        btn.classList.remove('copied');
+                    }, 1500);
+                } catch (e) {
+                    // clipboard unavailable (e.g. non-https): select-friendly fallback
+                    btn.textContent = 'copy failed';
+                    setTimeout(() => { btn.textContent = 'copy'; }, 1500);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

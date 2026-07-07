@@ -1,0 +1,13 @@
+# build artifacts
+target/
+
+# livenet config — contains local paths and node settings
+.env
+*.env
+
+# never commit keys, from anywhere
+*.pem
+
+# editor noise
+.DS_Store
+Thumbs.db
